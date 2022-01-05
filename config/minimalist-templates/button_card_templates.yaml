@@ -39,6 +39,16 @@ chip_temperature:
       }
       return icon + ' ' + states[variables.ulm_chip_temperature_outside].state + '° / ' + states[variables.ulm_chip_temperature_inside].state + '°' ;
     ]]]
+chip_car:
+  template: chips
+  triggers_update: 
+    - "[[[ variables.ulm_chip_range ]]]"
+    - "[[[ variables.ulm_chip_battery ]]]"
+  label: |
+    [[[
+      var battery = states[variables.ulm_chip_battery].state ? ' / ' + Math.trunc(states[variables.ulm_chip_battery].state) + ' %' : '';
+      return '🚗 ' +  states[variables.ulm_chip_range].state + ' km' + battery;
+    ]]]
 chip_icon_only:
   template: chips
   label: |
@@ -132,6 +142,36 @@ chip_navigate:
   styles:
     grid:
       - grid-template-areas: '"i"'
+chip_alarm_control_panel:
+  template: chips
+  icon: >
+    [[[
+      if (entity.state =='disarmed'){
+        return 'mdi:shield-off';
+      }
+      else if (entity.state =='arming'){
+        return 'mdi:shield';
+      }
+      else {
+        return 'mdi:shield-check'
+      }
+    ]]]
+  show_icon: true
+  styles:
+    grid:
+      - grid-template-areas: '"i l"'
+    icon:
+      - color: 'red'
+  state:
+    - value: 'disarmed'
+      styles: 
+        icon:
+          - color: '#0DA035'
+    - value: 'arming'
+      styles: 
+        icon:
+          - color: '#F6CF00'
+          - animation: blink 1s ease infinite
 ### TITLE ###
 card_title:
   tap_action:
@@ -148,6 +188,7 @@ card_title:
       - margin-top: 12px
       - margin-left: 24px
       - margin-bottom: 0px
+      - border-radius: 0
     grid:
       - grid-template-areas: '"n" "l"'
       - grid-template-columns: 1fr
@@ -195,10 +236,11 @@ vertical_buttons:
 vertical_buttons_blue:
   template: vertical_buttons
   variables:
+    ulm_state_entity: "default"
     state: "default"
   state:
     - operator: template
-      value: "[[[ return states['input_select.localisation_thomas'].state == variables.state ]]]"
+      value: "[[[ return states[variables.ulm_state_entity].state == variables.state ]]]"
       styles:
         icon:
           - color: 'rgba(var(--color-blue),1)'
@@ -211,13 +253,13 @@ vertical_buttons_blue:
         card:
           - background-color: 'rgba(var(--color-background-blue), var(--opacity-bg))'
 vertical_buttons_green:
+  template: vertical_buttons
   variables:
+    ulm_state_entity: "default"
     state: "default"
-  template: 
-    - vertical_buttons
   state:
     - operator: template
-      value: "[[[ return states['input_select.localisation_thomas'].state == variables.state ]]]"
+      value: "[[[ return states[variables.ulm_state_entity].state == variables.state ]]]"
       styles:
         icon:
           - color: 'rgba(var(--color-green),1)'
@@ -234,44 +276,11 @@ card_generic:
   template: 
     - icon_info_bg
     - ulm_language_variables
-  label: >
-    [[[
-      var unit = entity.attributes.unit_of_measurement != null ? ' ' + entity.attributes.unit_of_measurement : ''
-      if (entity.state == 'on') {
-        return variables.ulm_on;
-      } else if (entity.state == 'off') {
-        return variables.ulm_off;
-      } else if (entity.state == 'unavailable') {
-        return variables.ulm_unavailable;
-      } else if (entity.state == 'idle') {
-        return variables.ulm_idle;
-      } else if (entity.state == 'open') {
-        return variables.ulm_open;
-      } else if (entity.state == 'closed') {
-        return variables.ulm_closed;
-      } else {
-        return entity.state + unit;
-      }
-    ]]]
+  show_label: false
+  show_state: true
   styles:
-    icon:
-      - color: 'rgba(var(--color-theme),0.9)'
-    label:
-      - align-self: end
-      - justify-self: start
-      - font-weight: bold
-      - font-size: 14px
-      - margin-left: 12px
-      - filter: opacity(100%)
-    name:
-      - justify-self: start
-      - align-self: start
-      - font-weight: bolder
-      - font-size: 12px
-      - filter: opacity(40%)
-      - margin-left: 12px
     grid:
-      - grid-template-areas: '"i l" "i n"'
+      - grid-template-areas: '"i n" "i s"'
       - grid-template-columns: min-content auto
       - grid-template-rows: min-content min-content
 card_generic_swap:
@@ -318,40 +327,52 @@ card_generic_swap:
       - grid-template-areas: '"i n" "i l"'
       - grid-template-columns: min-content auto
       - grid-template-rows: min-content min-content
-card_light:
+light_internal:
   template: 
-    - icon_info_bg
-    - yellow
     - ulm_language_variables
+  variables:
+    ulm_consumption_sensor:
   tap_action:
     action: toggle
   hold_action:
     action: more-info
   label: >-
     [[[ 
+      var watts = "";
+      if (variables.ulm_consumption_sensor !== null) {
+        watts = "  •  " + states[variables.ulm_consumption_sensor].state + " W"
+      }
+
       if (entity.state !='unavailable'){
         if (entity.state =='off'){
           return variables.ulm_off;  
         } else if (entity.state == 'on'){
           if (entity.attributes.brightness != null){
             var bri = Math.round(entity.attributes.brightness / 2.55);
-            return (bri ? bri : '0') + '%';
+            return (bri ? bri : '0') + ' %' + watts;
           } else {
-            return variables.ulm_on
+            return variables.ulm_on + watts;
           } 
         }
       } else {
         return variables.ulm_unavailable;
       }
     ]]]
+card_light:
+  template: 
+    - icon_info_bg
+    - light_internal
+    - yellow
 card_light_slider:
   template: 
     - ulm_language_variables
   variables:
-    ulm_card_light_slider_name: "[[[ return entity.attributes.friendly_name ]]]"
+    ulm_consumption_sensor:
   show_icon: false
   show_name: false
   show_label: false
+  hold_action:
+    action: more-info
   state:
     - operator: template
       value: "[[[ return entity.state == 'on' ]]]"
@@ -374,31 +395,14 @@ card_light_slider:
         type: 'custom:button-card'
         template:
           - icon_info
-          - yellow_slider
+          - light_internal
+          - yellow_no_bg
+        variables:  
+          ulm_consumption_sensor: "[[[ return variables.ulm_consumption_sensor; ]]]"
         entity: "[[[ return entity.entity_id ]]]"
-        label: >-
-          [[[  
-            if (entity.state !='unavailable'){
-              if (entity.state =='off'){
-                return variables.ulm_off;  
-              } else if (entity.state == 'on'){
-                if (entity.attributes.brightness != null){
-                  var bri = Math.round(entity.attributes.brightness / 2.55);
-                  return (bri ? bri : '0') + '%';
-                } else {
-                  return variables.ulm_on
-                } 
-              }
-            } else {
-              return variables.ulm_unavailable;
-            }
-          ]]]
-        name: "[[[ return variables.ulm_card_light_slider_name ]]]"
         styles:
           card:
-            - box-shadow: none
-            - border-radius: var(--border-radius) var(--border-radius) var(--border-radius) var(--border-radius)
-            - padding: 0px
+            - border-radius: var(--border-radius)
     item2:
       card:
         type: 'custom:my-slider'
@@ -407,25 +411,28 @@ card_light_slider:
         height: 42px
         mainSliderColor: rgba(var(--color-yellow),1)
         secondarySliderColor: rgba(var(--color-yellow),0.2)
-        mainSliderColorOff: rgba(var(--color-theme),0.05)
+        mainSliderColorOff: var(--color-thumb-off)
         secondarySliderColorOff: rgba(var(--color-theme),0.05)
-        thumbHorizontalPadding: '0px'
-        thumbVerticalPadding: '0px'   
-        thumbWidth: 0px
+        thumbColor: rgba(var(--color-yellow),1)
+        thumbOffColor: var(--color-thumb-off)
+        thumbHorizontalPadding: '10px'
+        thumbVerticalPadding: '30px'   
+        thumbWidth: 20px
         card_mod:
         style: |
           ha-card {
-            border-radius: 14px;
             box-shadow: none;
           }
 card_light_slider_collapse:
   template: 
     - ulm_language_variables
   variables:
-    ulm_card_light_slider_collapse_name: "[[[ return entity.attributes.friendly_name ]]]"
+    ulm_consumption_sensor:
   show_icon: false
   show_name: false
   show_label: false
+  hold_action:
+    action: more-info
   state:
     - operator: template
       value: "[[[ return entity.state == 'on' ]]]"
@@ -449,31 +456,13 @@ card_light_slider_collapse:
         type: 'custom:button-card'
         template:
           - icon_info
-          - yellow_slider
+          - light_internal
+        variables:  
+          ulm_consumption_sensor: "[[[ return variables.ulm_consumption_sensor; ]]]"
         entity: "[[[ return entity.entity_id ]]]"
-        label: >-
-          [[[  
-            if (entity.state !='unavailable'){
-              if (entity.state =='off'){
-                return variables.ulm_off;  
-              } else if (entity.state == 'on'){
-                if (entity.attributes.brightness != null){
-                  var bri = Math.round(entity.attributes.brightness / 2.55);
-                  return (bri ? bri : '0') + '%';
-                } else {
-                  return variables.ulm_on
-                } 
-              }
-            } else {
-              return variables.ulm_unavailable;
-            }
-          ]]]
-        name: "[[[ return variables.ulm_card_light_slider_collapse_name ]]]"
         styles:
           card:
-            - box-shadow: none
-            - border-radius: var(--border-radius) var(--border-radius) var(--border-radius) var(--border-radius)
-            - padding: 0px
+            - border-radius: var(--border-radius)
     item2:
       card:
         type: conditional
@@ -481,31 +470,30 @@ card_light_slider_collapse:
           - entity: "[[[ return entity.entity_id ]]]"
             state: 'on'
         card:
-          type: 'custom:my-slider'
-          entity: '[[[ return entity.entity_id ]]]'
-          radius: 14px
-          height: 42px
           mainSliderColor: rgba(var(--color-yellow),1)
           secondarySliderColor: rgba(var(--color-yellow),0.2)
-          mainSliderColorOff: rgba(var(--color-theme),0.05)
+          mainSliderColorOff: var(--color-thumb-off)
           secondarySliderColorOff: rgba(var(--color-theme),0.05)
-          thumbHorizontalPadding: '0px'
-          thumbVerticalPadding: '0px'   
-          thumbWidth: 0px
+          thumbColor: rgba(var(--color-yellow),1)
+          thumbOffColor: var(--color-thumb-off)
+          thumbHorizontalPadding: '10px'
+          thumbVerticalPadding: '30px'   
+          thumbWidth: 20px
           card_mod:
           style: |
             ha-card {
-              border-radius: 14px;
               box-shadow: none;
             }
 card_light_slider_horizontal:
   template: 
     - ulm_language_variables
   variables:
-    ulm_card_light_slider_horizontal_name: "[[[ return entity.attributes.friendly_name ]]]"
+    ulm_consumption_sensor:
   show_icon: false
   show_name: false
   show_label: false
+  hold_action:
+    action: more-info
   state:
     - operator: template
       value: "[[[ return entity.state == 'on' ]]]"
@@ -527,48 +515,27 @@ card_light_slider_horizontal:
         type: 'custom:button-card'
         template:
           - icon_info
-          - yellow_slider
+          - light_internal
+        variables:  
+          ulm_consumption_sensor: "[[[ return variables.ulm_consumption_sensor; ]]]"
         entity: "[[[ return entity.entity_id ]]]"
-        label: >-
-          [[[  
-            if (entity.state !='unavailable'){
-              if (entity.state =='off'){
-                return variables.ulm_off;  
-              } else if (entity.state == 'on'){
-                if (entity.attributes.brightness != null){
-                  var bri = Math.round(entity.attributes.brightness / 2.55);
-                  return (bri ? bri : '0') + '%';
-                } else {
-                  return variables.ulm_on
-                } 
-              }
-            } else {
-              return variables.ulm_unavailable;
-            }
-          ]]]
-        name: "[[[ return variables.ulm_card_light_slider_horizontal_name ]]]"
         styles:
           card:
-            - box-shadow: none
-            - border-radius: var(--border-radius) var(--border-radius) var(--border-radius) var(--border-radius)
-            - padding: 0px
+            - border-radius: var(--border-radius)
     item2:
       card:
-        type: 'custom:my-slider'
-        entity: '[[[ return entity.entity_id ]]]'
-        radius: 14px
-        height: 42px
         mainSliderColor: rgba(var(--color-yellow),1)
         secondarySliderColor: rgba(var(--color-yellow),0.2)
-        mainSliderColorOff: rgba(var(--color-theme),0.05)
+        mainSliderColorOff: var(--color-thumb-off)
         secondarySliderColorOff: rgba(var(--color-theme),0.05)
-        thumbHorizontalPadding: '0px'
-        thumbVerticalPadding: '0px'   
-        thumbWidth: 0px
+        thumbColor: rgba(var(--color-yellow),1)
+        thumbOffColor: var(--color-thumb-off)
+        thumbHorizontalPadding: '10px'
+        thumbVerticalPadding: '30px'   
+        thumbWidth: 20px
         card_mod:
         style: |
           ha-card {
-            border-radius: 14px;
             box-shadow: none;
           }
 card_power_outlet:
@@ -592,6 +559,8 @@ card_power_outlet:
         return entity.state;
       }
     ]]]
+  hold_action:
+    action: more-info
 card_binary_sensor:
   template: 
     - icon_info_bg
@@ -829,21 +798,23 @@ card_battery:
       - grid-template-columns: min-content auto
       - grid-template-rows: min-content min-content
 card_person:
-  template: icon_info_bg
+  template: 
+    - icon_info_bg
+    - blue
   variables:
     ulm_card_person_use_entity_picture: false
     ulm_card_person_zone1: ''
     ulm_card_person_zone2: ''
   tap_action:
     action: more-info
-  show_label: true
+  show_label: false
   show_name: true
-  label: "[[[ return states[variables.ulm_card_person_entity].state ]]]"
-  name: "[[[ return states[variables.ulm_card_person_entity].attributes.friendly_name ]]]"
-  entity: "[[[ return variables.ulm_card_person_entity; ]]]"
+  show_state: true
+  label: "[[[ return entity.state ]]]"
+  name: "[[[ return entity.attributes.friendly_name ]]]"
   icon: 'mdi:face-man'
   show_entity_picture: "[[[ return variables.ulm_card_person_use_entity_picture ]]]"
-  entity_picture: "[[[ return variables.ulm_card_person_use_entity_picture != false ? states[variables.ulm_card_person_entity].attributes.entity_picture : null ]]]"
+  entity_picture: "[[[ return variables.ulm_card_person_use_entity_picture != false ? entity.attributes.entity_picture : null ]]]"
   styles:
     icon:
       - color: 'rgba(var(--color-theme),0.9)'
@@ -863,6 +834,10 @@ card_person:
               return 'stretch stretch';
             }
           ]]]
+    grid:
+      - grid-template-areas: '"i n" "i s"'
+      - grid-template-columns: min-content auto
+      - grid-template-rows: min-content min-content
     custom_fields:
       notification:
         - border-radius: 50%
@@ -876,7 +851,7 @@ card_person:
         - line-height: 14px
         - background-color: >
             [[[
-              if (states[variables.ulm_card_person_entity].state != 'home'){
+              if (entity.state != 'home'){
                 return "rgba(var(--color-green),1)";
               } else {
                 return "rgba(var(--color-blue),1)";
@@ -885,15 +860,15 @@ card_person:
   custom_fields:
     notification: >
       [[[
-        if (states[variables.ulm_card_person_entity].state != 'home'){
-          if (states[variables.ulm_card_person_entity].state == variables.ulm_card_person_zone1){
+        if (entity.state != 'home'){
+          if (entity.state == variables.ulm_card_person_zone1){
             var icon = states[variables.ulm_card_person_zone1].attributes.icon != null ? states[variables.ulm_card_person_zone1].attributes.icon : 'mdi:help-circle'
             return '<ha-icon icon="' + icon + '" style="width: 10px; height: 10px; color: var(--primary-background-color);"></ha-icon>';
-          } else if (states[variables.ulm_card_person_entity].state == variables.ulm_card_person_zone2){
+          } else if (entity.state == variables.ulm_card_person_zone2){
             var icon = states[variables.ulm_card_person_zone2].attributes.icon != null ? states[variables.ulm_card_person_zone2].attributes.icon : 'mdi:help-circle'
             return '<ha-icon icon="' + icon + '" style="width: 10px; height: 10px; color: var(--primary-background-color);"></ha-icon>';
           } else {
-            return '<ha-icon icon="mdi:home-minus" style="width: 10px; height: 10px; color: var(--primary-background-color);"></ha-icon>';
+            return '<ha-icon icon="mdi:minus" style="width: 10px; height: 10px; color: var(--primary-background-color);"></ha-icon>';
           }
         } else {
           return '<ha-icon icon="mdi:home-variant" style="width: 10px; height: 10px; color: var(--primary-background-color);"></ha-icon>';
@@ -922,6 +897,8 @@ card_script:
       - grid-template-rows: min-content
 ### 2-LINE CARDS ###
 card_cover_with_buttons:
+  template:
+    - blue_no_state
   variables:
     ulm_card_cover_with_buttons_name: "n/a"
   triggers_update:
@@ -944,10 +921,13 @@ card_cover_with_buttons:
           - icon_info
           - ulm_language_variables
           - cover
+        styles: 
+          card:
+            - background: none
         tap_action:
           action: more-info
         entity: '[[[ return variables.ulm_card_cover_with_buttons_entity ]]]'
-        name: '[[[ return variables.ulm_card_cover_with_buttons_name ]]]'
+        #name: '[[[ return variables.ulm_card_cover_with_buttons_name ]]]'
     item2:
       card:
         type: 'custom:button-card'
@@ -959,10 +939,10 @@ card_cover_with_buttons:
               template: widget_icon
               tap_action:
                 action: call-service
-                service: cover.close_cover
+                service: cover.open_cover
                 service_data:
                   entity_id: '[[[ return variables.ulm_card_cover_with_buttons_entity ]]]'
-              icon: 'mdi:arrow-down'
+              icon: 'mdi:arrow-up'
           item2:
             card:
               type: 'custom:button-card'
@@ -972,23 +952,21 @@ card_cover_with_buttons:
                 service: cover.stop_cover
                 service_data:
                   entity_id: '[[[ return variables.ulm_card_cover_with_buttons_entity ]]]'
-              icon: 'mdi:pause'
+              icon: 'mdi:stop'
           item3:
             card:
               type: 'custom:button-card'
               template: widget_icon
               tap_action:
                 action: call-service
-                service: cover.open_cover
+                service: cover.close_cover
                 service_data:
                   entity_id: '[[[ return variables.ulm_card_cover_with_buttons_entity ]]]'
-              icon: 'mdi:arrow-up'
+              icon: 'mdi:arrow-down'
 card_graph:
   variables:
     ulm_card_graph_color: "var(--info-color)"
     ulm_card_graph_name: "n/a"
-  triggers_update:
-    - "[[[ variables.ulm_card_graph_entity ]]]"
   styles:
     grid:
       - grid-template-areas: '"item1" "item2"'
@@ -1010,13 +988,13 @@ card_graph:
             - box-shadow: none
             - border-radius: var(--border-radius) var(--border-radius) 0px 0px
             - padding: 12px
-        entity: '[[[ return variables.ulm_card_graph_entity ]]]'
+        entity: sensor.netatmo_wohnraum_temperature
         name: '[[[ return variables.ulm_card_graph_name ]]]'
     item2:
       card:
         type: 'custom:mini-graph-card'
         entities:
-          - entity: '[[[ return variables.ulm_card_graph_entity ]]]'
+          - entity: sensor.netatmo_wohnraum_temperature
         line_color: '[[[ return variables.ulm_card_graph_color ]]]'
         show:
           name: false
@@ -1102,7 +1080,8 @@ card_media_player_with_controls:
 ### INTERNAL TEMPLATES ###
 blue:
   state:
-    - styles:
+    - value: 'open'
+      styles:
         icon:
           - color: 'rgba(var(--color-blue),1)'
         label:
@@ -1113,7 +1092,31 @@ blue:
           - background-color: 'rgba(var(--color-blue), 0.2)'
         card:
           - background-color: 'rgba(var(--color-background-blue), var(--opacity-bg))'
-      value: 'on'
+    - value: 'on'
+      styles:
+        icon:
+          - color: 'rgba(var(--color-blue),1)'
+        label:
+          - color: 'rgba(var(--color-blue-text),1)'
+        name:
+          - color: 'rgba(var(--color-blue-text),1)'
+        img_cell:
+          - background-color: 'rgba(var(--color-blue), 0.2)'
+        card:
+          - background-color: 'rgba(var(--color-background-blue), var(--opacity-bg))'
+    - value: 'home'
+      styles:
+        icon:
+          - color: 'rgba(var(--color-blue),1)'
+        label:
+          - color: 'rgba(var(--color-blue-text),1)'
+        name:
+          - color: 'rgba(var(--color-blue-text),1)'
+        img_cell:
+          - background-color: 'rgba(var(--color-blue), 0.2)'
+        card:
+          - background-color: 'rgba(var(--color-background-blue), var(--opacity-bg))'
+      
 blue_no_state:
   styles:
     icon:
@@ -1144,8 +1147,6 @@ chips:
     grid:
       - grid-template-areas: '"l"'
     card:
-      - border-radius: 18px
-      - box-shadow: var(--box-shadow)
       - height: 36px
       - width: auto
       - padding-left: 6px
@@ -1154,22 +1155,22 @@ chips:
 cover:
   tap_action:
     action: more-info
-  icon: |
-    [[[
-        var icon = 'mdi:help-circle';
-        if (typeof states[entity.entity_id].attributes.current_position === 'undefined'){
-          if (states[entity.entity_id].state == 'closed'){
-            var icon = 'mdi:window-shutter';
-          } else
-            var icon = 'mdi:window-shutter-open';
-        } else {
-          if (states[entity.entity_id].attributes.current_position == 0){
-            var icon = 'mdi:window-shutter';
-          } else
-            var icon = 'mdi:window-shutter-open';
-        }
-        return icon ;
-    ]]]
+  # icon: |
+  #   [[[
+  #       var icon = 'mdi:help-circle';
+  #       if (typeof states[entity.entity_id].attributes.current_position === 'undefined'){
+  #         if (states[entity.entity_id].state == 'closed'){
+  #           var icon = 'mdi:window-shutter';
+  #         } else
+  #           var icon = 'mdi:window-shutter-open';
+  #       } else {
+  #         if (states[entity.entity_id].attributes.current_position == 0){
+  #           var icon = 'mdi:window-shutter';
+  #         } else
+  #           var icon = 'mdi:window-shutter-open';
+  #       }
+  #       return icon ;
+  #   ]]]
   label: >-
     [[[
         var icon = 'mdi:help-circle';
@@ -1334,10 +1335,8 @@ icon_info:
       - grid-template-columns: min-content auto
       - grid-template-rows: min-content min-content
     card:
-      - border-radius: 21px 8px 8px 21px 
       - box-shadow: none
       - padding: 0px
-      # - background-color: 'rgba(var(--color-theme),0)'
   custom_fields:
     notification: >
       [[[
@@ -1403,8 +1402,6 @@ icon_info_bg:
       - grid-template-columns: min-content auto
       - grid-template-rows: min-content min-content
     card:
-      - border-radius: var(--border-radius)
-      - box-shadow: var(--box-shadow)
       - padding: 12px
   custom_fields:
     notification: >
@@ -1530,6 +1527,7 @@ list_items:
     card:
       - box-shadow: none
       - padding: 0px
+      - background: none
 list_items_line:
   styles:
     grid:
@@ -1572,6 +1570,20 @@ yellow:
           - background-color: 'rgba(var(--color-yellow), 0.2)'
         card:
           - background-color: 'rgba(var(--color-background-yellow),var(--opacity-bg))'
+      value: 'on'
+yellow_no_bg:
+  state:
+    - styles:
+        icon:
+          - color: 'rgba(var(--color-yellow),1)'
+        label:
+          - color: 'rgba(var(--color-yellow-text),1)'
+        name:
+          - color: 'rgba(var(--color-yellow-text),1)'
+        img_cell:
+          - background-color: 'rgba(var(--color-yellow), 0.2)'
+        card:
+          - background-color: 'rgba(0,0,0,0)'
       value: 'on'
 yellow_slider:
   state:
@@ -1616,6 +1628,8 @@ binary_sensor:
   template: card_binary_sensor
 outlet:
   template: card_power_outlet
+person:
+  template: card_person
 #thermostat:
 #  template: card_thermostat
 cover_buttons:
@@ -1628,7 +1642,6 @@ graph:
   variables:
     ulm_card_graph_color: var(--google-blue)
     ulm_card_graph_name: "Default name"
-    ulm_card_graph_entity: "[[[ return entity.entity_id ]]]"
 media:
   template: card_media_player
 battery:
